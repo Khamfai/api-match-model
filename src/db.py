@@ -2,17 +2,16 @@ import sqlite3
 import os
 from datetime import datetime
 import logging
-from typing import List, Dict, Optional, Tuple
-import json
+from typing import List, Dict, Optional
 
-from api.config import Config
+from src.config import Config
 
 logger = logging.getLogger(__name__)
 config = Config()
 
 
 class MatchingDB:
-    def __init__(self, db_path: str = "name_matching.db"):
+    def __init__(self, db_path: str = "./data/name_matching.db"):
         """Initialize the database connection and create tables if they don't exist"""
         self.db_path = config.DB_PATH
         self.init_database()
@@ -20,6 +19,9 @@ class MatchingDB:
     def init_database(self):
         """Create the database tables if they don't exist"""
         try:
+            db_dir = os.path.dirname(self.db_path)
+            if db_dir and not os.path.exists(db_dir):
+                os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 

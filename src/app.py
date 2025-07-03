@@ -1,10 +1,13 @@
+from datetime import datetime
 import os
 import tempfile
 import atexit
 import gc
+from time import time
 
-from model.data_preparation import DataPreprocessor
-from model.model_training import MatchingModel
+from src.config import Config
+from src.utils import generate_batch_id, process_name_pair, validate_input_string
+from src.model_service import ModelService
 
 # Fix matplotlib and multiprocessing issues
 os.environ["MPLCONFIGDIR"] = tempfile.mkdtemp()
@@ -15,17 +18,13 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sys
 import logging
-from datetime import datetime
 from flask_swagger_ui import get_swaggerui_blueprint
 import re
 from urllib.parse import quote, unquote
-
-# Add parent directory to path to import our modules
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 
 # Import our database module
-from db import MatchingDB
+from src.db import MatchingDB
 
 # Add this after the existing imports
 import signal
@@ -40,10 +39,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Global variables
-model = None
-preprocessor = None
+config = Config()
+model_service = None
 db = None
-model_path = "../trained_matching_model"
+model_path = config.MODEL_PATH
+db_path = config.DB_PATH
 
 
 def validate_input_string(input_str, max_length=100):
@@ -74,17 +74,16 @@ def validate_input_string(input_str, max_length=100):
 
 
 def load_model():
-    """Load the trained model"""
-    global model, preprocessor, db
+    """Load the trained model using ModelService"""
+    global model_service, db
     try:
-        if os.path.exists(model_path):
-            model = MatchingModel()
-            model.load_model(model_path)
-            preprocessor = DataPreprocessor()
+        # Initialize ModelService
+        model_service = ModelService()
 
+        # Load the model
+        if model_service.load_model(model_path):
             # Initialize database
-            db = MatchingDB()
-
+            db = MatchingDB(db_path)
             logger.info("Model and database loaded successfully")
             return True
         else:
@@ -95,7 +94,7 @@ def load_model():
         return False
 
 
-# Load model immediately when the module is imported (works with both direct execution and Gunicorn)
+# Load model immediately when the module is imported
 try:
     if load_model():
         logger.info("✓ Model loaded successfully on startup")
@@ -133,7 +132,8 @@ def health_check():
         {
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
-            "model_loaded": model is not None,
+            "model_loaded": model_service is not None
+            and model_service.is_model_loaded(),
         }
     )
 
@@ -141,11 +141,9 @@ def health_check():
 @app.route("/predict", methods=["POST"])
 def predict_match():
     """Predict if English and Thai names match"""
-    start_time = time.time()
-
     try:
         # Check if model is loaded
-        if model is None:
+        if not model_service or not model_service.is_model_loaded():
             return (
                 jsonify(
                     {
@@ -170,34 +168,11 @@ def predict_match():
                 400,
             )
 
-        # Validate input strings
-        is_valid_en, msg_en = validate_input_string(english_name)
-        if not is_valid_en:
-            return jsonify({"error": f"Invalid english_name: {msg_en}"}), 400
-
-        is_valid_th, msg_th = validate_input_string(thai_name)
-        if not is_valid_th:
-            return jsonify({"error": f"Invalid thai_name: {msg_th}"}), 400
-
-        # Preprocess names
-        english_clean = preprocessor.normalize_english_name(english_name)
-        thai_clean = preprocessor.normalize_thai_name(thai_name)
-
-        # Predict
-        similarity = model.predict_similarity(english_clean, thai_clean)
-        is_match = model.is_match(english_clean, thai_clean)
-
-        # Determine confidence level
-        confidence_score = abs(similarity - model.threshold)
-        if confidence_score > 0.3:
-            confidence = "High"
-        elif confidence_score > 0.15:
-            confidence = "Medium"
-        else:
-            confidence = "Low"
-
-        # Calculate processing time
-        processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        # Process the name pair using utility function
+        try:
+            result = process_name_pair(english_name, thai_name, model_service)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
 
         # Save to database
         try:
@@ -205,14 +180,14 @@ def predict_match():
                 db.save_prediction(
                     english_name=english_name,
                     thai_name=thai_name,
-                    english_name_normalized=english_clean,
-                    thai_name_normalized=thai_clean,
-                    similarity_score=float(similarity),
-                    is_match=bool(is_match),
-                    confidence=confidence,
-                    threshold_used=model.threshold,
+                    english_name_normalized=result["english_name_normalized"],
+                    thai_name_normalized=result["thai_name_normalized"],
+                    similarity_score=result["similarity_score"],
+                    is_match=result["is_match"],
+                    confidence=result["confidence"],
+                    threshold_used=model_service.get_threshold(),
                     request_ip=request.remote_addr,
-                    processing_time_ms=processing_time,
+                    processing_time_ms=result["processing_time_ms"],
                 )
         except Exception as db_error:
             logger.error(f"Database save error: {str(db_error)}")
@@ -222,14 +197,14 @@ def predict_match():
             {
                 "english_name": english_name,
                 "thai_name": thai_name,
-                "english_name_normalized": english_clean,
-                "thai_name_normalized": thai_clean,
-                "similarity_score": round(float(similarity), 4),
-                "is_match": bool(is_match),
-                "confidence": confidence,
-                "threshold": model.threshold,
+                "english_name_normalized": result["english_name_normalized"],
+                "thai_name_normalized": result["thai_name_normalized"],
+                "similarity_score": round(result["similarity_score"], 4),
+                "is_match": result["is_match"],
+                "confidence": result["confidence"],
+                "threshold": model_service.get_threshold(),
                 "timestamp": datetime.now().isoformat(),
-                "processing_time_ms": round(processing_time, 2),
+                "processing_time_ms": round(result["processing_time_ms"], 2),
             }
         )
 
@@ -242,10 +217,10 @@ def predict_match():
 def batch_predict():
     """Predict multiple name pairs at once"""
     start_time = time.time()
-    batch_id = str(uuid.uuid4())
+    batch_id = generate_batch_id()
 
     try:
-        if model is None:
+        if not model_service or not model_service.is_model_loaded():
             return (
                 jsonify(
                     {
@@ -288,37 +263,13 @@ def batch_predict():
                     failed_predictions += 1
                     continue
 
-                # Validate input strings
-                is_valid_en, msg_en = validate_input_string(english_name)
-                if not is_valid_en:
-                    results.append(
-                        {"index": i, "error": f"Invalid english_name: {msg_en}"}
-                    )
+                # Process the name pair using utility function
+                try:
+                    result = process_name_pair(english_name, thai_name, model_service)
+                except ValueError as e:
+                    results.append({"index": i, "error": str(e)})
                     failed_predictions += 1
                     continue
-
-                is_valid_th, msg_th = validate_input_string(thai_name)
-                if not is_valid_th:
-                    results.append(
-                        {"index": i, "error": f"Invalid thai_name: {msg_th}"}
-                    )
-                    failed_predictions += 1
-                    continue
-
-                # Preprocess and predict
-                english_clean = preprocessor.normalize_english_name(english_name)
-                thai_clean = preprocessor.normalize_thai_name(thai_name)
-
-                similarity = model.predict_similarity(english_clean, thai_clean)
-                is_match = model.is_match(english_clean, thai_clean)
-
-                confidence_score = abs(similarity - model.threshold)
-                if confidence_score > 0.3:
-                    confidence = "High"
-                elif confidence_score > 0.15:
-                    confidence = "Medium"
-                else:
-                    confidence = "Low"
 
                 # Save individual prediction to database
                 try:
@@ -326,12 +277,12 @@ def batch_predict():
                         db.save_prediction(
                             english_name=english_name,
                             thai_name=thai_name,
-                            english_name_normalized=english_clean,
-                            thai_name_normalized=thai_clean,
-                            similarity_score=float(similarity),
-                            is_match=bool(is_match),
-                            confidence=confidence,
-                            threshold_used=model.threshold,
+                            english_name_normalized=result["english_name_normalized"],
+                            thai_name_normalized=result["thai_name_normalized"],
+                            similarity_score=result["similarity_score"],
+                            is_match=result["is_match"],
+                            confidence=result["confidence"],
+                            threshold_used=model_service.get_threshold(),
                             request_ip=request.remote_addr,
                         )
                 except Exception as db_error:
@@ -342,9 +293,9 @@ def batch_predict():
                         "index": i,
                         "english_name": english_name,
                         "thai_name": thai_name,
-                        "similarity_score": round(float(similarity), 4),
-                        "is_match": bool(is_match),
-                        "confidence": confidence,
+                        "similarity_score": round(result["similarity_score"], 4),
+                        "is_match": result["is_match"],
+                        "confidence": result["confidence"],
                     }
                 )
                 successful_predictions += 1
@@ -482,13 +433,13 @@ def export_predictions():
 def model_info():
     """Get model information"""
     try:
-        if model is None:
+        if not model_service or not model_service.is_model_loaded():
             return jsonify({"error": "Model not loaded"}), 500
 
         return jsonify(
             {
                 "model_loaded": True,
-                "threshold": model.threshold,
+                "threshold": model_service.get_threshold(),
                 "model_path": model_path,
                 "model_exists": os.path.exists(model_path),
             }
@@ -502,7 +453,7 @@ def model_info():
 def update_threshold():
     """Update model threshold"""
     try:
-        if model is None:
+        if not model_service or not model_service.is_model_loaded():
             return jsonify({"error": "Model not loaded"}), 500
 
         data = request.get_json()
@@ -514,14 +465,13 @@ def update_threshold():
         if not isinstance(new_threshold, (int, float)) or not (0 <= new_threshold <= 1):
             return jsonify({"error": "threshold must be a number between 0 and 1"}), 400
 
-        old_threshold = model.threshold
-        model.threshold = float(new_threshold)
+        old_threshold = model_service.set_threshold(new_threshold)
 
         return jsonify(
             {
                 "message": "Threshold updated successfully",
                 "old_threshold": old_threshold,
-                "new_threshold": model.threshold,
+                "new_threshold": model_service.get_threshold(),
             }
         )
 
@@ -529,6 +479,7 @@ def update_threshold():
         return jsonify({"error": f"Error updating threshold: {str(e)}"}), 500
 
 
+# ... existing code ...
 # Enhanced error handlers
 @app.errorhandler(404)
 def not_found(error):
@@ -762,14 +713,14 @@ def catch_all(path):
 
 
 # Swagger UI setup - Fixed URL handling
-SWAGGER_URL = "/api/docs"  # URL for exposing Swagger UI
-API_URL = "/static/swagger.yaml"  # Our API url (now properly served)
+SWAGGER_URL = "/api/docs"  
+API_URL = "/static/swagger.yaml" 
 
 # Call factory function to create our blueprint
 swaggerui_blueprint = get_swaggerui_blueprint(
-    SWAGGER_URL,  # Swagger UI static files will be mapped to '{SWAGGER_URL}/dist/'
+    SWAGGER_URL,
     API_URL,
-    config={  # Swagger UI config overrides
+    config={
         "app_name": "English-Thai Name Matching API",
         "validatorUrl": None,  # Disable validator to prevent external URL calls
     },
@@ -780,12 +731,10 @@ app.register_blueprint(swaggerui_blueprint)
 
 def cleanup_resources():
     """Clean up resources on shutdown"""
-    global model, preprocessor, db
+    global model_service, db
     try:
-        if model is not None:
-            del model
-        if preprocessor is not None:
-            del preprocessor
+        if model_service is not None:
+            del model_service
         if db is not None:
             db.close()
             del db

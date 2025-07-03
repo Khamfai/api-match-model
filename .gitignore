@@ -3,3 +3,4 @@ venv
 __pycache__
 en_th_matching_model
 trained_matching_model
+data
