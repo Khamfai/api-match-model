@@ -1,0 +1,502 @@
+openapi: 3.0.3
+info:
+  title: English-Thai Name Matching API
+  description: |
+    A REST API for matching English and Thai names using machine learning.
+    This API provides endpoints for single and batch name matching predictions,
+    model information retrieval, and threshold management.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:4000
+    description: Development server
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Check if the API service is running and if the model is loaded
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00.123456"
+                  model_loaded:
+                    type: boolean
+                    example: true
+                required:
+                  - status
+                  - timestamp
+                  - model_loaded
+
+  /predict:
+    post:
+      tags:
+        - Prediction
+      summary: Predict name match
+      description: Predict if an English name and Thai name refer to the same person
+      operationId: predictMatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                english_name:
+                  type: string
+                  description: English name to match
+                  example: "John Smith"
+                thai_name:
+                  type: string
+                  description: Thai name to match
+                  example: "จอห์น สมิธ"
+              required:
+                - english_name
+                - thai_name
+            examples:
+              example1:
+                summary: Basic name matching
+                value:
+                  english_name: "John Smith"
+                  thai_name: "จอห์น สมิธ"
+              example2:
+                summary: Different names
+                value:
+                  english_name: "Mary Johnson"
+                  thai_name: "สมชาย ใจดี"
+      responses:
+        "200":
+          description: Successful prediction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  english_name:
+                    type: string
+                    example: "John Smith"
+                  thai_name:
+                    type: string
+                    example: "จอห์น สมิธ"
+                  english_name_normalized:
+                    type: string
+                    example: "john smith"
+                  thai_name_normalized:
+                    type: string
+                    example: "จอห์น สมิธ"
+                  similarity_score:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 1
+                    example: 0.8542
+                  is_match:
+                    type: boolean
+                    example: true
+                  confidence:
+                    type: string
+                    enum: ["High", "Medium", "Low"]
+                    example: "High"
+                  threshold:
+                    type: number
+                    format: float
+                    example: 0.7
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00.123456"
+                required:
+                  - english_name
+                  - thai_name
+                  - english_name_normalized
+                  - thai_name_normalized
+                  - similarity_score
+                  - is_match
+                  - confidence
+                  - threshold
+                  - timestamp
+        "400":
+          description: Bad request - missing or invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                missing_data:
+                  summary: No JSON data provided
+                  value:
+                    error: "No JSON data provided"
+                missing_fields:
+                  summary: Missing required fields
+                  value:
+                    error: "Both english_name and thai_name are required"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                model_not_loaded:
+                  summary: Model not loaded
+                  value:
+                    error: "Model not loaded. Please ensure the model is trained and available."
+                server_error:
+                  summary: Internal server error
+                  value:
+                    error: "Internal server error: [error details]"
+
+  /batch_predict:
+    post:
+      tags:
+        - Prediction
+      summary: Batch predict name matches
+      description: Predict multiple name pairs at once for efficient processing
+      operationId: batchPredict
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name_pairs:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      english_name:
+                        type: string
+                        example: "John Smith"
+                      thai_name:
+                        type: string
+                        example: "จอห์น สมิธ"
+                    required:
+                      - english_name
+                      - thai_name
+                  minItems: 1
+                  maxItems: 100
+              required:
+                - name_pairs
+            example:
+              name_pairs:
+                - english_name: "John Smith"
+                  thai_name: "จอห์น สมิธ"
+                - english_name: "Mary Johnson"
+                  thai_name: "แมรี่ จอห์นสัน"
+                - english_name: "David Brown"
+                  thai_name: "สมชาย ใจดี"
+      responses:
+        "200":
+          description: Successful batch prediction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: object
+                          properties:
+                            index:
+                              type: integer
+                              example: 0
+                            english_name:
+                              type: string
+                              example: "John Smith"
+                            thai_name:
+                              type: string
+                              example: "จอห์น สมิธ"
+                            similarity_score:
+                              type: number
+                              format: float
+                              example: 0.8542
+                            is_match:
+                              type: boolean
+                              example: true
+                            confidence:
+                              type: string
+                              enum: ["High", "Medium", "Low"]
+                              example: "High"
+                          required:
+                            - index
+                            - english_name
+                            - thai_name
+                            - similarity_score
+                            - is_match
+                            - confidence
+                        - type: object
+                          properties:
+                            index:
+                              type: integer
+                              example: 1
+                            error:
+                              type: string
+                              example: "Both english_name and thai_name are required"
+                          required:
+                            - index
+                            - error
+                  total_processed:
+                    type: integer
+                    example: 3
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00.123456"
+                required:
+                  - results
+                  - total_processed
+                  - timestamp
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                missing_array:
+                  summary: Missing name_pairs array
+                  value:
+                    error: "name_pairs array is required"
+                invalid_type:
+                  summary: Invalid data type
+                  value:
+                    error: "name_pairs must be an array"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /model/info:
+    get:
+      tags:
+        - Model Management
+      summary: Get model information
+      description: Retrieve information about the loaded model including threshold and status
+      operationId: getModelInfo
+      responses:
+        "200":
+          description: Model information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_loaded:
+                    type: boolean
+                    example: true
+                  threshold:
+                    type: number
+                    format: float
+                    example: 0.7
+                  model_path:
+                    type: string
+                    example: "../trained_matching_model"
+                  model_exists:
+                    type: boolean
+                    example: true
+                required:
+                  - model_loaded
+                  - threshold
+                  - model_path
+                  - model_exists
+        "500":
+          description: Model not loaded or error occurred
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                model_not_loaded:
+                  summary: Model not loaded
+                  value:
+                    error: "Model not loaded"
+                error_occurred:
+                  summary: Error getting model info
+                  value:
+                    error: "Error getting model info: [error details]"
+
+  /model/threshold:
+    post:
+      tags:
+        - Model Management
+      summary: Update model threshold
+      description: Update the similarity threshold used for determining name matches
+      operationId: updateThreshold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                threshold:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 1
+                  example: 0.75
+                  description: New threshold value between 0 and 1
+              required:
+                - threshold
+            examples:
+              lower_threshold:
+                summary: Lower threshold for more matches
+                value:
+                  threshold: 0.6
+              higher_threshold:
+                summary: Higher threshold for stricter matching
+                value:
+                  threshold: 0.8
+      responses:
+        "200":
+          description: Threshold updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Threshold updated successfully"
+                  old_threshold:
+                    type: number
+                    format: float
+                    example: 0.7
+                  new_threshold:
+                    type: number
+                    format: float
+                    example: 0.75
+                required:
+                  - message
+                  - old_threshold
+                  - new_threshold
+        "400":
+          description: Bad request - invalid threshold value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                missing_threshold:
+                  summary: Missing threshold value
+                  value:
+                    error: "threshold value is required"
+                invalid_threshold:
+                  summary: Invalid threshold range
+                  value:
+                    error: "threshold must be a number between 0 and 1"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message describing what went wrong
+          example: "An error occurred"
+      required:
+        - error
+
+    NamePair:
+      type: object
+      properties:
+        english_name:
+          type: string
+          description: English name
+          example: "John Smith"
+        thai_name:
+          type: string
+          description: Thai name
+          example: "จอห์น สมิธ"
+      required:
+        - english_name
+        - thai_name
+
+    PredictionResult:
+      type: object
+      properties:
+        english_name:
+          type: string
+          example: "John Smith"
+        thai_name:
+          type: string
+          example: "จอห์น สมิธ"
+        english_name_normalized:
+          type: string
+          example: "john smith"
+        thai_name_normalized:
+          type: string
+          example: "จอห์น สมิธ"
+        similarity_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.8542
+        is_match:
+          type: boolean
+          example: true
+        confidence:
+          type: string
+          enum: ["High", "Medium", "Low"]
+          example: "High"
+        threshold:
+          type: number
+          format: float
+          example: 0.7
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00.123456"
+      required:
+        - english_name
+        - thai_name
+        - english_name_normalized
+        - thai_name_normalized
+        - similarity_score
+        - is_match
+        - confidence
+        - threshold
+        - timestamp
+
+tags:
+  - name: Health
+    description: Health check and service status endpoints
+  - name: Prediction
+    description: Name matching prediction endpoints
+  - name: Model Management
+    description: Model information and configuration endpoints
