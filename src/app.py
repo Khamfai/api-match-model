@@ -129,11 +129,12 @@ def serve_static(filename):
 
 @app.route("/", methods=["GET"])
 def index_check():
-    """Health check endpoint"""
+    """Index check endpoint"""
     return jsonify(
         {
             "status": "200",
             "message": "Welcome to model macthing",
+            "version": "1.0.0",
             "timestamp": datetime.now().isoformat(),
         }
     )
