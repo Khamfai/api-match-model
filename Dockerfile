@@ -2,8 +2,7 @@
 FROM python:3.12-slim
 
 # Set working directory
-RUN mkdir -p /usr/src/app
-WORKDIR /usr/src/app
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -56,7 +55,7 @@ RUN unzip "${MODEL_SAVE_DIR}/${MODEL_NAME}.zip" -d "${MODEL_SAVE_DIR}/${MODEL_NA
     rm -rf /var/lib/apt/lists/* # Clean up apt cache
 
     # Update your Flask app's model path to point to the downloaded model
-ENV MODEL_PATH="models/${MODEL_NAME}"
+ENV MODEL_PATH=app/models/${MODEL_NAME}
 
 # Copy all files
 COPY . .
