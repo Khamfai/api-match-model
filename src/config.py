@@ -9,7 +9,7 @@ class Config:
     """Base configuration"""
 
     SECRET_KEY = os.environ.get("SECRET_KEY") or "dev-secret-key-change-in-production"
-    MODEL_PATH = os.environ.get("MODEL_PATH") or "./trained_matching_model"
+    MODEL_PATH = os.environ.get("MODEL_PATH") or "models/en_th_matching_model"
     DB_PATH = os.environ.get("DB_PATH") or "./data/name_matching.db"
     DEBUG = False
     TESTING = False
