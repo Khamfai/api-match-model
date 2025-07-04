@@ -61,8 +61,8 @@ ENV MODEL_PATH="models/${MODEL_NAME}"
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p /app/logs
-RUN mkdir -p /app/data
+RUN mkdir -p /logs
+RUN mkdir -p /data
 
 # Set proper permissions
 # RUN chmod +x api/start_server.sh
