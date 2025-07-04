@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install gdown
 
  #URL Download and Directory inside the container where the model will be saved
-ENV MODEL_NAME="en_th_matching_model_v_1"
+ENV MODEL_NAME="en_th_matching_model"
 ARG MODEL_DRIVE_ID="1vsv-suGgyCTfEnIZhtg-10poeT72xKd2"
 # ENV MODEL_DOWNLOAD_URL=""
 ARG MODEL_SAVE_DIR="/app/models"
@@ -71,8 +71,8 @@ RUN mkdir -p /app/data
 EXPOSE 4000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
-    CMD curl -f http://localhost:4000/health || exit 1
+# HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
+#     CMD curl -f http://localhost:4000/health || exit 1
 
 # Start the application
 CMD ["gunicorn", "--config", "src/gunicorn.conf.py", "wsgi:app"]
