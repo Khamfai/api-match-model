@@ -763,4 +763,4 @@ atexit.register(cleanup_resources)
 
 if __name__ == "__main__":
     # Model is already loaded above, just run the app
-    app.run(host="0.0.0.0", port=4000, debug=True)
+    app.run(host="0.0.0.0", port=3000, debug=True)

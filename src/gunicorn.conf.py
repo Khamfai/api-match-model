@@ -1,4 +1,4 @@
-bind = "0.0.0.0:4000"
+bind = "0.0.0.0:3000"
 workers = 1  # Keep single worker to avoid multiprocessing issues
 worker_class = "sync"
 worker_connections = 1000

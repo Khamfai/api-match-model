@@ -68,11 +68,11 @@ RUN mkdir -p /app/data
 # RUN chmod +x api/start_server.sh
 
 # Expose port
-EXPOSE 4000
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
-    CMD curl -f http://localhost:4000/health || exit 1
+    CMD curl -f http://localhost:3000/health || exit 1
 
 # Start the application
 CMD ["gunicorn", "--config", "src/gunicorn.conf.py", "wsgi:app"]
