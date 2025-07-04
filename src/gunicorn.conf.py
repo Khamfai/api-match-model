@@ -1,34 +1,21 @@
 bind = "0.0.0.0:4000"
-workers = 1  # Use only 1 worker to avoid memory issues
-worker_class = "sync"  # Use sync worker instead of async
+workers = 1  # Keep single worker to avoid multiprocessing issues
+worker_class = "sync"
 worker_connections = 1000
-timeout = 120  # Increase timeout for model processing
+timeout = 300  # Increase timeout for model processing
 keepalive = 2
-max_requests = 1000  # Restart workers after 100 requests to prevent memory leaks
-max_requests_jitter = 100
-preload_app = True  # Preload the app to share model across workers
-# Remove or comment out the worker_tmp_dir line for macOS
-# worker_tmp_dir = "/dev/shm"  # This doesn't exist on macOS
+max_requests = 100  # Reduce to restart workers more frequently
+max_requests_jitter = 10
+preload_app = True
+
+# Add these lines to handle memory and multiprocessing issues
+worker_tmp_dir = "/tmp"  # Use /tmp instead of /dev/shm on macOS
+max_worker_memory = 2048  # Limit worker memory (MB)
+worker_rlimit_nofile = 1024
+
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"
 
 # Specify the WSGI module and variable
 wsgi_module = "app:app"
-
-
-# bind = "0.0.0.0:4000"
-# workers = 2
-# worker_class = "sync"
-# worker_connections = 1000
-# timeout = 30
-# keepalive = 2
-# max_requests = 1000
-# max_requests_jitter = 100
-# preload_app = True
-# accesslog = "-"
-# errorlog = "-"
-# loglevel = "info"
-
-# # Specify the WSGI module and variable
-# wsgi_module = "app:app"

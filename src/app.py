@@ -1,9 +1,8 @@
-from datetime import datetime
+from datetime import datetime, time
 import os
 import tempfile
 import atexit
 import gc
-from time import time
 
 from src.config import Config
 from src.utils import generate_batch_id, process_name_pair, validate_input_string
@@ -13,6 +12,8 @@ from src.model_service import ModelService
 os.environ["MPLCONFIGDIR"] = tempfile.mkdtemp()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -32,7 +33,8 @@ import sys
 from werkzeug.exceptions import RequestEntityTooLarge
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Enable CORS for all routes
+CORS(app, origins=["*"], methods=["GET", "POST", "OPTIONS"])
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -216,7 +218,7 @@ def predict_match():
 @app.route("/batch_predict", methods=["POST"])
 def batch_predict():
     """Predict multiple name pairs at once"""
-    start_time = time.time()
+    start_time = datetime.now()
     batch_id = generate_batch_id()
 
     try:
@@ -307,7 +309,7 @@ def batch_predict():
                 failed_predictions += 1
 
         # Calculate processing time
-        processing_time = (time.time() - start_time) * 1000
+        processing_time = (datetime.now() - start_time).total_seconds() * 1000
 
         # Save batch metadata to database
         try:
@@ -713,8 +715,8 @@ def catch_all(path):
 
 
 # Swagger UI setup - Fixed URL handling
-SWAGGER_URL = "/api/docs"  
-API_URL = "/static/swagger.yaml" 
+SWAGGER_URL = "/api/docs"
+API_URL = "/static/swagger.yaml"
 
 # Call factory function to create our blueprint
 swaggerui_blueprint = get_swaggerui_blueprint(

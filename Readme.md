@@ -27,8 +27,16 @@ python main.py
 ```bash
 gunicorn --bind 0.0.0.0:4000 wsgi:app
 ```
+- Run Gunicorn Backgroud Service
+```bash
+./start_server.sh &
+```
+- Stop Gunicorn Service
+```bash
+pkill -f gunicorn
+```
 
-- Using Docker
+* Using Docker
 ```bash
 docker build -t name-matching-api .
 docker run -p 4000:4000 name-matching-api
