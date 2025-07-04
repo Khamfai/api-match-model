@@ -128,7 +128,7 @@ def serve_static(filename):
 
 
 @app.route("/", methods=["GET"])
-def health_check():
+def index_check():
     """Health check endpoint"""
     return jsonify(
         {
