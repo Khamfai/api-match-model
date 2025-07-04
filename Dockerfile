@@ -2,6 +2,7 @@
 FROM python:3.12-slim
 
 # Set working directory
+RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
 # Install system dependencies
@@ -26,7 +27,7 @@ ENV MPLCONFIGDIR=/tmp/matplotlib
 RUN mkdir -p /tmp/matplotlib
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install gdown
 
