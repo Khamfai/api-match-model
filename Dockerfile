@@ -35,7 +35,7 @@ RUN pip install gdown
 ENV MODEL_NAME="en_th_matching_model"
 ARG MODEL_DRIVE_ID="1vsv-suGgyCTfEnIZhtg-10poeT72xKd2"
 # ENV MODEL_DOWNLOAD_URL=""
-ARG MODEL_SAVE_DIR="/models"
+ARG MODEL_SAVE_DIR="/app/models"
 
 # Create the directory for the model
 RUN mkdir -p ${MODEL_SAVE_DIR}
