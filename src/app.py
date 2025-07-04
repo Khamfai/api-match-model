@@ -127,6 +127,18 @@ def serve_static(filename):
         return jsonify({"error": "File not found"}), 404
 
 
+@app.route("/", methods=["GET"])
+def health_check():
+    """Health check endpoint"""
+    return jsonify(
+        {
+            "status": "200",
+            "message": "Welcome to model macthing",
+            "timestamp": datetime.now().isoformat(),
+        }
+    )
+
+
 @app.route("/health", methods=["GET"])
 def health_check():
     """Health check endpoint"""
