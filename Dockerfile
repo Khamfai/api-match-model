@@ -34,7 +34,7 @@ RUN pip install gdown
 ENV MODEL_NAME="en_th_matching_model"
 ARG MODEL_DRIVE_ID="1vsv-suGgyCTfEnIZhtg-10poeT72xKd2"
 # ENV MODEL_DOWNLOAD_URL=""
-ARG MODEL_SAVE_DIR="/app/models"
+ARG MODEL_SAVE_DIR="/app/src"
 
 # Create the directory for the model
 RUN mkdir -p ${MODEL_SAVE_DIR}
@@ -55,7 +55,7 @@ RUN unzip "${MODEL_SAVE_DIR}/${MODEL_NAME}.zip" -d "${MODEL_SAVE_DIR}/${MODEL_NA
     rm -rf /var/lib/apt/lists/* # Clean up apt cache
 
     # Update your Flask app's model path to point to the downloaded model
-ENV MODEL_PATH=app/models/${MODEL_NAME}
+ENV MODEL_PATH=./${MODEL_NAME}
 
 # Copy all files
 COPY . .

@@ -10,7 +10,7 @@ sleep 2
 # Start the server with simple configuration (like the working command)
 echo "Starting Gunicorn server..."
 cd "$(dirname "$0")"
-gunicorn --bind 0.0.0.0:3000 wsgi:app
+gunicorn --bind 0.0.0.0:4000 wsgi:app
 
 # Run multi process
 # gunicorn --bind 0.0.0.0:3000 --workers=4 --threads=1 wsgi:app
