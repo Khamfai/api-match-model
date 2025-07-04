@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y \
     unzip \
     git \
     build-essential \
-    gdown \
     gcc \
     g++ \
     python3-dev \
@@ -29,6 +28,7 @@ RUN mkdir -p /tmp/matplotlib
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r api/requirements.txt
+RUN pip install gdown
 
  #URL Download and Directory inside the container where the model will be saved
 ENV MODEL_NAME="en_th_matching_model_v_1"
