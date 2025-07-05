@@ -52,7 +52,7 @@ RUN echo "Downloading model with gdown (ID: ${MODEL_DRIVE_ID})..." && \
     echo "Model downloaded."
 
 # Unzip the model (assuming it's a .zip file, adjust if it's .tar.gz or a directory)
-RUN unzip "${MODEL_SAVE_DIR}/${MODEL_NAME}.zip" -d "${MODEL_SAVE_DIR}/${MODEL_NAME}" && \
+RUN unzip "${MODEL_SAVE_DIR}/${MODEL_NAME}.zip" -d "${MODEL_SAVE_DIR}" && \
     rm "${MODEL_SAVE_DIR}/${MODEL_NAME}.zip" && \
     rm -rf /var/lib/apt/lists/* # Clean up apt cache
 
