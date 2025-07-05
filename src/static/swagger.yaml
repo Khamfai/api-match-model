@@ -4,7 +4,7 @@ info:
   description: |
     A REST API for matching English and Thai names using machine learning.
     This API provides endpoints for single and batch name matching predictions,
-    model information retrieval, and threshold management.
+    model information retrieval, threshold management, and data analytics.
   version: 1.0.0
   contact:
     name: API Support
@@ -14,12 +14,68 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
+  - url: http://localhost:4000
+    description: Development server (Gunicorn)
   - url: http://localhost:3000
-    description: Development server
+    description: Development server (Flask)
   - url: https://api.example.com
     description: Production server
 
 paths:
+  /:
+    get:
+      tags:
+        - General
+      summary: API welcome endpoint
+      description: Welcome message with API information and available endpoints
+      operationId: welcomeMessage
+      responses:
+        "200":
+          description: Welcome message with API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Welcome to English-Thai Name Matching API"
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  documentation:
+                    type: string
+                    example: "/api/docs"
+                  health_check:
+                    type: string
+                    example: "/health"
+                  endpoints:
+                    type: object
+                    properties:
+                      predict:
+                        type: string
+                        example: "POST /predict"
+                      batch_predict:
+                        type: string
+                        example: "POST /batch_predict"
+                      model_info:
+                        type: string
+                        example: "GET /model/info"
+                      update_threshold:
+                        type: string
+                        example: "POST /model/threshold"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00.123456"
+                required:
+                  - message
+                  - version
+                  - documentation
+                  - health_check
+                  - endpoints
+                  - timestamp
+
   /health:
     get:
       tags:
@@ -127,6 +183,10 @@ paths:
                     type: string
                     format: date-time
                     example: "2024-01-15T10:30:00.123456"
+                  processing_time_ms:
+                    type: number
+                    format: float
+                    example: 45.67
                 required:
                   - english_name
                   - thai_name
@@ -137,6 +197,7 @@ paths:
                   - confidence
                   - threshold
                   - timestamp
+                  - processing_time_ms
         "400":
           description: Bad request - missing or invalid input
           content:
@@ -173,7 +234,7 @@ paths:
       tags:
         - Prediction
       summary: Batch predict name matches
-      description: Predict multiple name pairs at once for efficient processing
+      description: Predict multiple name pairs at once for efficient processing (max 100 pairs)
       operationId: batchPredict
       requestBody:
         required: true
@@ -216,6 +277,9 @@ paths:
               schema:
                 type: object
                 properties:
+                  batch_id:
+                    type: string
+                    example: "batch_20240115_103000_abc123"
                   results:
                     type: array
                     items:
@@ -263,14 +327,28 @@ paths:
                   total_processed:
                     type: integer
                     example: 3
+                  successful_predictions:
+                    type: integer
+                    example: 2
+                  failed_predictions:
+                    type: integer
+                    example: 1
                   timestamp:
                     type: string
                     format: date-time
                     example: "2024-01-15T10:30:00.123456"
+                  processing_time_ms:
+                    type: number
+                    format: float
+                    example: 156.78
                 required:
+                  - batch_id
                   - results
                   - total_processed
+                  - successful_predictions
+                  - failed_predictions
                   - timestamp
+                  - processing_time_ms
         "400":
           description: Bad request
           content:
@@ -286,8 +364,178 @@ paths:
                   summary: Invalid data type
                   value:
                     error: "name_pairs must be an array"
+                batch_too_large:
+                  summary: Batch size exceeded
+                  value:
+                    error: "Batch size limited to 100 pairs"
         "500":
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/predictions:
+    get:
+      tags:
+        - Data Analytics
+      summary: Get stored predictions
+      description: Retrieve stored predictions with optional filtering and pagination
+      operationId: getPredictions
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of predictions to return (max 1000)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - name: offset
+          in: query
+          description: Number of predictions to skip for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: is_match
+          in: query
+          description: Filter by match result (true/false)
+          required: false
+          schema:
+            type: boolean
+        - name: start_date
+          in: query
+          description: Filter predictions from this date (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: Filter predictions until this date (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Predictions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StoredPrediction"
+                  count:
+                    type: integer
+                    example: 25
+                  limit:
+                    type: integer
+                    example: 100
+                  offset:
+                    type: integer
+                    example: 0
+                required:
+                  - predictions
+                  - count
+                  - limit
+                  - offset
+        "500":
+          description: Database error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/statistics:
+    get:
+      tags:
+        - Data Analytics
+      summary: Get database statistics
+      description: Retrieve overall statistics about predictions and usage
+      operationId: getStatistics
+      responses:
+        "200":
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_predictions:
+                    type: integer
+                    example: 1250
+                  total_matches:
+                    type: integer
+                    example: 875
+                  total_non_matches:
+                    type: integer
+                    example: 375
+                  match_rate:
+                    type: number
+                    format: float
+                    example: 0.7
+                  avg_similarity_score:
+                    type: number
+                    format: float
+                    example: 0.6543
+                  total_batch_predictions:
+                    type: integer
+                    example: 45
+        "500":
+          description: Database error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/export:
+    post:
+      tags:
+        - Data Analytics
+      summary: Export predictions to CSV
+      description: Export stored predictions to a CSV file
+      operationId: exportPredictions
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  description: Maximum number of predictions to export
+                  example: 1000
+      responses:
+        "200":
+          description: Export completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Export completed successfully"
+                  filename:
+                    type: string
+                    example: "predictions_export_20240115_103000.csv"
+                  filepath:
+                    type: string
+                    example: "/tmp/predictions_export_20240115_103000.csv"
+                required:
+                  - message
+                  - filename
+                  - filepath
+        "500":
+          description: Export failed
           content:
             application/json:
               schema:
@@ -317,7 +565,7 @@ paths:
                     example: 0.7
                   model_path:
                     type: string
-                    example: "../trained_matching_model"
+                    example: "models/en_th_matching_model"
                   model_exists:
                     type: boolean
                     example: true
@@ -428,6 +676,14 @@ components:
           type: string
           description: Error message describing what went wrong
           example: "An error occurred"
+        message:
+          type: string
+          description: Additional error details
+          example: "Detailed error information"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00.123456"
       required:
         - error
 
@@ -482,6 +738,10 @@ components:
           type: string
           format: date-time
           example: "2024-01-15T10:30:00.123456"
+        processing_time_ms:
+          type: number
+          format: float
+          example: 45.67
       required:
         - english_name
         - thai_name
@@ -492,11 +752,67 @@ components:
         - confidence
         - threshold
         - timestamp
+        - processing_time_ms
+
+    StoredPrediction:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        english_name:
+          type: string
+          example: "John Smith"
+        thai_name:
+          type: string
+          example: "จอห์น สมิธ"
+        english_name_normalized:
+          type: string
+          example: "john smith"
+        thai_name_normalized:
+          type: string
+          example: "จอห์น สมิธ"
+        similarity_score:
+          type: number
+          format: float
+          example: 0.8542
+        is_match:
+          type: boolean
+          example: true
+        confidence:
+          type: string
+          example: "High"
+        threshold_used:
+          type: number
+          format: float
+          example: 0.7
+        request_ip:
+          type: string
+          example: "192.168.1.100"
+        processing_time_ms:
+          type: number
+          format: float
+          example: 45.67
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00.123456"
+      required:
+        - id
+        - english_name
+        - thai_name
+        - similarity_score
+        - is_match
+        - created_at
 
 tags:
+  - name: General
+    description: General API information and welcome endpoints
   - name: Health
     description: Health check and service status endpoints
   - name: Prediction
     description: Name matching prediction endpoints
   - name: Model Management
     description: Model information and configuration endpoints
+  - name: Data Analytics
+    description: Data retrieval, statistics, and export endpoints
