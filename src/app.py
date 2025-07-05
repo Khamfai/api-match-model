@@ -357,7 +357,7 @@ def batch_predict():
 
 
 # Add new database-related endpoints
-@app.route("/api/predictions", methods=["GET"])
+@app.route("/predictions", methods=["GET"])
 def get_predictions():
     """Get stored predictions with optional filtering"""
     try:
@@ -397,7 +397,7 @@ def get_predictions():
         return jsonify({"error": f"Error retrieving predictions: {str(e)}"}), 500
 
 
-@app.route("/api/statistics", methods=["GET"])
+@app.route("/statistics", methods=["GET"])
 def get_statistics():
     """Get database statistics"""
     try:
@@ -412,7 +412,7 @@ def get_statistics():
         return jsonify({"error": f"Error getting statistics: {str(e)}"}), 500
 
 
-@app.route("/api/export", methods=["POST"])
+@app.route("/export", methods=["POST"])
 def export_predictions():
     """Export predictions to CSV"""
     try:
