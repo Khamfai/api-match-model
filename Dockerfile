@@ -34,9 +34,11 @@ RUN pip install gdown
 ENV MODEL_NAME="en_th_matching_model"
 ARG MODEL_DRIVE_ID="1vsv-suGgyCTfEnIZhtg-10poeT72xKd2"
 # ENV MODEL_DOWNLOAD_URL=""
-ARG MODEL_SAVE_DIR="/app/src"
+ARG MODEL_SAVE_DIR="/app/models"
 
-# Create the directory for the model
+# Create necessary directories and model directory
+RUN mkdir -p /app/logs
+RUN mkdir -p /app/data
 RUN mkdir -p ${MODEL_SAVE_DIR}
 
 # Download the model during the Docker build process using CURL
@@ -55,14 +57,10 @@ RUN unzip "${MODEL_SAVE_DIR}/${MODEL_NAME}.zip" -d "${MODEL_SAVE_DIR}/${MODEL_NA
     rm -rf /var/lib/apt/lists/* # Clean up apt cache
 
     # Update your Flask app's model path to point to the downloaded model
-ENV MODEL_PATH=./${MODEL_NAME}
+ENV MODEL_PATH=${MODEL_SAVE_DIR}/${MODEL_NAME}
 
 # Copy all files
 COPY . .
-
-# Create necessary directories
-RUN mkdir -p /logs
-RUN mkdir -p /data
 
 # Set proper permissions
 # RUN chmod +x api/start_server.sh

@@ -79,6 +79,7 @@ def load_model():
     """Load the trained model using ModelService"""
     global model_service, db
     try:
+        print(f"Current working directory: {os.getcwd()}")
         # Initialize ModelService
         model_service = ModelService()
 
