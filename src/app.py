@@ -356,6 +356,129 @@ def batch_predict():
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 
+@app.route("/find_best_match", methods=["POST"])
+def find_best_match():
+    """Find the Thai name with highest similarity score for given English name"""
+    start_time = datetime.now()
+
+    try:
+        if not model_service or not model_service.is_model_loaded():
+            return (
+                jsonify(
+                    {
+                        "error": "Model not loaded. Please ensure the model is trained and available."
+                    }
+                ),
+                500,
+            )
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+
+        english_name = data.get("english_name", "").strip()
+        thai_names = data.get("thai_names", [])
+
+        if not english_name:
+            return jsonify({"error": "english_name is required"}), 400
+
+        if not thai_names or not isinstance(thai_names, list):
+            return jsonify({"error": "thai_names must be a non-empty array"}), 400
+
+        if len(thai_names) > 50:
+            return jsonify({"error": "Maximum 50 Thai names allowed per request"}), 400
+
+        # Validate thai_names structure
+        for i, item in enumerate(thai_names):
+            if not isinstance(item, dict) or "name" not in item or "uuid" not in item:
+                return (
+                    jsonify(
+                        {
+                            "error": f"Invalid structure at index {i}. Each item must have 'name' and 'uuid' fields"
+                        }
+                    ),
+                    400,
+                )
+
+            if not item["name"].strip():
+                return (
+                    jsonify(
+                        {
+                            "error": f"Empty Thai name at index {i} (uuid: {item.get('uuid', 'unknown')})"
+                        }
+                    ),
+                    400,
+                )
+
+        best_match = None
+        best_score = -1
+
+        # Process each Thai name
+        for item in thai_names:
+            thai_name = item["name"].strip()
+            uuid = item["uuid"]
+
+            try:
+                result = process_name_pair(english_name, thai_name, model_service)
+
+                if result["similarity_score"] > best_score:
+                    best_score = result["similarity_score"]
+                    best_match = {
+                        "thai_name": thai_name,
+                        "uuid": uuid,
+                        "thai_name_normalized": result["thai_name_normalized"],
+                        "similarity_score": round(result["similarity_score"], 4),
+                        "is_match": result["is_match"],
+                        "confidence": result["confidence"],
+                    }
+
+            except ValueError as e:
+                logger.warning(
+                    f"Error processing Thai name '{thai_name}' (uuid: {uuid}): {str(e)}"
+                )
+                continue
+
+        if not best_match:
+            return jsonify({"error": "No valid Thai names could be processed"}), 400
+
+        # Calculate processing time
+        processing_time = (datetime.now() - start_time).total_seconds() * 1000
+
+        # Save the best match to database
+        try:
+            if db:
+                db.save_prediction(
+                    english_name=english_name,
+                    thai_name=best_match["thai_name"],
+                    english_name_normalized=result["english_name_normalized"],
+                    thai_name_normalized=best_match["thai_name_normalized"],
+                    similarity_score=best_match["similarity_score"],
+                    is_match=best_match["is_match"],
+                    confidence=best_match["confidence"],
+                    threshold_used=model_service.get_threshold(),
+                    request_ip=request.remote_addr,
+                    processing_time_ms=processing_time,
+                )
+        except Exception as db_error:
+            logger.error(f"Database save error: {str(db_error)}")
+
+        return jsonify(
+            {
+                "english_name": english_name,
+                "english_name_normalized": result["english_name_normalized"],
+                "best_match": best_match,
+                "total_candidates": len(thai_names),
+                "threshold": model_service.get_threshold(),
+                "timestamp": datetime.now().isoformat(),
+                "processing_time_ms": round(processing_time, 2),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in find_best_match: {str(e)}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+
 # Add new database-related endpoints
 @app.route("/predictions", methods=["GET"])
 def get_predictions():
