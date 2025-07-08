@@ -356,8 +356,8 @@ def batch_predict():
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 
-@app.route("/find_best_match", methods=["POST"])
-def find_best_match():
+@app.route("/best_predict", methods=["POST"])
+def best_predict():
     """Find the Thai name with highest similarity score for given English name"""
     start_time = datetime.now()
 
@@ -838,6 +838,7 @@ def catch_all(path):
                 "endpoints": {
                     "predict": "POST /predict",
                     "batch_predict": "POST /batch_predict",
+                    "best_predict": "POST /best_predict",
                     "model_info": "GET /model/info",
                     "update_threshold": "POST /model/threshold",
                 },
